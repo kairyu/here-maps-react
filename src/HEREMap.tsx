@@ -9,32 +9,32 @@ import { useScript } from './hooks/use-script';
 import { useLink } from './hooks/use-link';
 
 export interface HEREMapProps extends H.Map.Options, HEvents {
-  appId: string;
-  appCode: string;
+  apikey: string;
   mapContainerId?: string;
   animateCenter?: boolean;
   animateZoom?: boolean;
   hidpi?: boolean;
   interactive?: boolean;
   secure?: boolean;
-  setLayer?: {
-    layer: keyof H.service.MapType;
-    mapType: keyof H.service.DefaultLayers;
+  platformOptions?: H.service.Platform.Options;
+  style?: {
+    config: string;
+    baseUrl?: string;
   };
 }
 
 export const HEREMap: React.FC<HEREMapProps> = ({
   animateCenter,
   animateZoom,
-  appId,
-  appCode,
+  apikey,
   mapContainerId = 'map-container',
   center,
   hidpi,
   interactive,
   secure,
   zoom,
-  setLayer,
+  platformOptions,
+  style,
   children,
   ...rest
 }) => {
@@ -45,29 +45,28 @@ export const HEREMap: React.FC<HEREMapProps> = ({
   const [ui, setUi] = React.useState<H.ui.UI | undefined>(undefined);
   const debouncedResizeMap = debounce(resizeMap, 200);
   const [,] = useLink(
-    'https://js.api.here.com/v3/3.0/mapsjs-ui.css?dp-version=1526040296',
+    'https://js.api.here.com/v3/3.1/mapsjs-ui.css',
     'map-styles',
   );
   const [coreLoaded] = useScript(
-    'https://js.api.here.com/v3/3.0/mapsjs-core.js',
+    'https://js.api.here.com/v3/3.1/mapsjs-core.js',
     'core',
   );
   const [serviceLoaded] = useScript(
-    'https://js.api.here.com/v3/3.0/mapsjs-service.js',
+    'https://js.api.here.com/v3/3.1/mapsjs-service.js',
     'service',
   );
   const [uiLoaded] = useScript(
-    'https://js.api.here.com/v3/3.0/mapsjs-ui.js',
+    'https://js.api.here.com/v3/3.1/mapsjs-ui.js',
     'ui',
   );
   const [mapeventsLoaded] = useScript(
-    'https://js.api.here.com/v3/3.0/mapsjs-mapevents.js',
+    'https://js.api.here.com/v3/3.1/mapsjs-mapevents.js',
     'mapevents',
   );
   const platform = usePlatform(
-    {
-      app_code: appCode,
-      app_id: appId,
+    platformOptions || {
+      apikey: apikey,
       useHTTPS: secure === true,
     },
     coreLoaded && serviceLoaded && uiLoaded && mapeventsLoaded,
@@ -82,19 +81,11 @@ export const HEREMap: React.FC<HEREMapProps> = ({
       const mapElement = document.querySelector(`#${mapContainerId}`);
 
       let customLayer: H.map.layer.Layer | undefined;
-      if (setLayer && setLayer.mapType && setLayer.layer) {
-        const { mapType, layer } = setLayer;
-        if (mapType === 'incidents' || mapType === 'venues') {
-          customLayer = defaultLayers[mapType];
-        } else {
-          customLayer = defaultLayers[mapType][layer];
-        }
-      }
 
       if (mapElement && !map) {
         const newMap = new H.Map(
           mapElement,
-          customLayer || defaultLayers.normal.map,
+          customLayer || defaultLayers.vector.normal.map,
           {
             center,
             zoom,
@@ -131,7 +122,6 @@ export const HEREMap: React.FC<HEREMapProps> = ({
     map,
     mapContainerId,
     platform,
-    setLayer,
     zoom,
   ]);
 
@@ -167,6 +157,29 @@ export const HEREMap: React.FC<HEREMapProps> = ({
       map.setZoom(zoom, animateZoom === true);
     }
   }, [animateZoom, map, zoom]);
+
+  function usePrevious(value: any): any {
+    const ref = React.useRef();
+    React.useEffect(() => {
+      ref.current = value;
+    });
+    return ref.current;
+  }
+
+  const previousStyle = usePrevious(style);
+  React.useEffect(() => {
+    if (map && style) {
+      if (
+        style.config !== previousStyle.config ||
+        style.baseUrl !== previousStyle.baseUrl
+      ) {
+        const newStyle = new H.map.Style(style.config, style.baseUrl);
+        const baseLayer = map.getBaseLayer() as H.map.layer.BaseTileLayer;
+        const provider = baseLayer.getProvider();
+        provider.setStyle(newStyle);
+      }
+    }
+  }, [map, style, previousStyle]);
 
   function resizeMap() {
     if (map) {

@@ -40,7 +40,7 @@ export function setMarkerDragEvent(map: H.Map, behavior: H.mapevents.Behavior) {
         target instanceof H.map.Marker ||
         e.target instanceof H.map.DomMarker
       ) {
-        target.setPosition(
+        target.setGeometry(
           map.screenToGeo(pointer.viewportX, pointer.viewportY),
         );
       }
